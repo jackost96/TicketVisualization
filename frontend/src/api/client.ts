@@ -13,6 +13,16 @@ export class ApiError extends Error {
   }
 }
 
+/** Turns a caught error into a user-displayable message. Shows the real message for both API
+ * errors (e.g. "Incorrect email or password") and unexpected JS errors (e.g. a bug like a
+ * malformed URL) rather than collapsing everything to a generic fallback -- makes bugs visible
+ * instead of hiding them behind "Something went wrong". */
+export function getErrorMessage(err: unknown, fallback = "Something went wrong"): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
 let authToken: string | null = localStorage.getItem(TOKEN_STORAGE_KEY);
 let onUnauthorized: (() => void) | null = null;
 
@@ -40,7 +50,10 @@ interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: Record<string, QueryValue>): string {
-  const url = new URL(API_BASE_URL.replace(/\/$/, "") + path);
+  // Base is needed because API_BASE_URL may be relative (e.g. "/api/v1" in the Docker build,
+  // so nginx can same-origin proxy it) -- `new URL(relativePath)` throws without one. Absolute
+  // API_BASE_URL values (native dev's "http://localhost:8000/api/v1") just ignore the base.
+  const url = new URL(API_BASE_URL.replace(/\/$/, "") + path, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null && value !== "") {
@@ -54,6 +67,7 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, form, query } = options;
   const headers: Record<string, string> = {};
+  const wasAuthenticated = Boolean(authToken);
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
 
   let requestBody: BodyInit | undefined;
@@ -67,7 +81,12 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   const response = await fetch(buildUrl(path, query), { method, headers, body: requestBody });
 
-  if (response.status === 401) {
+  // A 401 on a request that carried a token means that token is no longer valid -- a genuine
+  // session expiry. A 401 on a request with no token (e.g. a login attempt with wrong
+  // credentials) isn't a session expiring, it's just a rejected request -- fall through to the
+  // normal error-detail handling below so the real reason (e.g. "Incorrect email or password")
+  // reaches the user instead of a misleading "Session expired".
+  if (response.status === 401 && wasAuthenticated) {
     setAuthToken(null);
     onUnauthorized?.();
     throw new ApiError(401, null, "Session expired");

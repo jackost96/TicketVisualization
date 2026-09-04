@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createProject } from "@/api/projects";
-import { ApiError } from "@/api/client";
+import { getErrorMessage } from "@/api/client";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -36,7 +36,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       setName("");
       navigate(`/projects/${project.key}`);
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Failed to create project"),
+    onError: (err) => setError(getErrorMessage(err, "Failed to create project")),
   });
 
   return (

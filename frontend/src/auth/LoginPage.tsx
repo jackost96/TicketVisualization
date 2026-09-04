@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { registerUser } from "@/api/users";
-import { ApiError } from "@/api/client";
+import { getErrorMessage } from "@/api/client";
 import { useAuth } from "./AuthContext";
 
 export function LoginPage() {
@@ -29,7 +29,7 @@ export function LoginPage() {
       await login(email, password);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong");
+      setError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

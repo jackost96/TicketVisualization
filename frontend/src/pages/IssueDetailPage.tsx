@@ -26,7 +26,7 @@ import {
 import { listIssueLinkTypes, listIssueTypes, listPriorities, listStatuses } from "@/api/metadata";
 import { listUsers } from "@/api/users";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
-import { ApiError } from "@/api/client";
+import { getErrorMessage } from "@/api/client";
 
 export function IssueDetailPage() {
   const { key } = useParams<{ key: string }>();
@@ -64,7 +64,7 @@ export function IssueDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ["issue-transitions", key] });
       await queryClient.invalidateQueries({ queryKey: ["issue-history", key] });
     },
-    onError: (err) => setTransitionError(err instanceof ApiError ? err.message : "Transition failed"),
+    onError: (err) => setTransitionError(getErrorMessage(err, "Transition failed")),
   });
 
   const commentMutation = useMutation({

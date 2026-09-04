@@ -23,7 +23,7 @@ import { listProjects } from "@/api/projects";
 import { listIssueTypes, listPriorities } from "@/api/metadata";
 import { listUsers } from "@/api/users";
 import { createIssue } from "@/api/issues";
-import { ApiError } from "@/api/client";
+import { getErrorMessage } from "@/api/client";
 
 interface CreateIssueDialogProps {
   open: boolean;
@@ -65,7 +65,7 @@ export function CreateIssueDialog({ open, onOpenChange, defaultProjectKey }: Cre
       onOpenChange(false);
       navigate(`/issues/${issue.key}`);
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Failed to create issue"),
+    onError: (err) => setError(getErrorMessage(err, "Failed to create issue")),
   });
 
   function resetForm() {

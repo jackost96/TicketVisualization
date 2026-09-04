@@ -4,13 +4,46 @@ Prototype Jira-replacement app: projects, issues, custom workflows, permissions,
 comments, boards, dashboards, saved filters, and a Jira migration script — with a React web UI on
 top. Python (FastAPI) + PostgreSQL backend, React + Vite + TypeScript frontend.
 
-## Prerequisites
+## Quick start: run everything with Docker
+
+The whole stack — PostgreSQL, backend, frontend — runs from one `docker-compose.yml`. This is the
+easiest way to get the app running and doesn't need Python, Node, or a local PostgreSQL install.
+
+```bash
+docker compose up --build
+```
+
+- Frontend: `http://localhost:3000`
+- Backend API / docs: `http://localhost:8000/docs`
+- PostgreSQL: exposed on host port **5433** (mapped from the container's 5432, to avoid clashing
+  with a native Postgres install already using 5432 — see below)
+
+The backend container runs `alembic upgrade head` and seeds reference data automatically on every
+startup (idempotent, safe to re-run) before starting `uvicorn`. The frontend is a multi-stage
+build: compiled to static files by Vite, then served by nginx, which also reverse-proxies `/api/*`
+to the backend container — so the browser only ever talks to one origin and CORS never comes into
+play in this setup.
+
+Override the JWT secret by setting `JWT_SECRET` in a `.env` file at the repo root (docker compose
+reads it automatically for variable substitution); otherwise it falls back to the same
+`change-me-in-production` default as native dev.
+
+To stop everything: `docker compose down` (add `-v` to also drop the `pgdata` volume and start
+fresh next time).
+
+This is a **production-style** build — no hot reload. For active development with instant reload
+on save, use the native setup below instead (optionally still using the dockerized Postgres, see
+step 2).
+
+## Native dev setup (hot reload)
+
+### Prerequisites
 
 - Python 3.11+
 - Node.js 18+ (for the frontend)
-- PostgreSQL 14+ (either a local install, or via Docker — `docker-compose.yml` is included)
+- PostgreSQL 14+ (either a local install, or via Docker — see step 2)
 
-## Setup
+### Setup
 
 1. **Create a virtualenv and install dependencies**
 
@@ -23,13 +56,16 @@ top. Python (FastAPI) + PostgreSQL backend, React + Vite + TypeScript frontend.
 
 2. **Start PostgreSQL**
 
-   Either via Docker:
+   Either via Docker (exposed on host port **5433**, not 5432, so it doesn't clash with a native
+   install — use `postgresql+psycopg://ticketsystem:ticketsystem@localhost:5433/ticketsystem` in
+   `.env` if you go this route):
 
    ```bash
    docker compose up -d db
    ```
 
-   or point at a local PostgreSQL install. Either way, create the app database and role:
+   or point at a local PostgreSQL install on the standard 5432 port. Either way, create the app
+   database and role:
 
    ```sql
    CREATE ROLE ticketsystem WITH LOGIN PASSWORD 'ticketsystem' CREATEDB;
@@ -126,6 +162,9 @@ real per-project workflow graph).
 ## Project structure
 
 ```
+Dockerfile              backend image (multi-stage: pip install -> slim runtime, non-root user)
+docker-entrypoint.sh    runs alembic upgrade + seed_defaults, then starts uvicorn
+docker-compose.yml      db + backend + frontend, full stack
 app/
   main.py              FastAPI app + router registration + CORS
   core/                config, security (JWT/password hashing), request dependencies
@@ -141,6 +180,8 @@ migrations/            Alembic migrations
 scripts/migrate_from_jira/   Jira REST API -> Postgres ETL
 tests/                 pytest suite (real Postgres, no mocking)
 frontend/
+  Dockerfile           multi-stage: vite build -> nginx (proxies /api to the backend container)
+  nginx.conf           SPA fallback + /api reverse proxy
   src/api/             typed fetch client, one module per backend resource area
   src/auth/            AuthContext, ProtectedRoute, LoginPage
   src/components/      nav (app shell, dropdowns, global search), issues (shared table, create

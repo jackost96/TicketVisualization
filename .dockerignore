@@ -1,0 +1,16 @@
+.git/
+.claude/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+scratch/
+.env
+tests/
+frontend/
+start-dev.ps1
+start-dev.bat
+README.md
